@@ -41,8 +41,7 @@ fn main() {
 
     let mut elf = elf::ELF::parse(&elf_path).expect("Failed to parse ELF!");
 
-    
-    println!("Name: {}\n", elf.get_section_name(0).unwrap());
+    println!("Name: {}\n", elf.get_section_name(1).unwrap());
 
     execute_instruction(0);
 }
