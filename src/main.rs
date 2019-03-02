@@ -1,4 +1,4 @@
-// extern crate byteorder;
+extern crate byteorder;
 extern crate nom;
 
 mod cpu;
@@ -18,5 +18,8 @@ fn main() {
     memory.load_elf(&mut elf);
     memory.read(0x10000);
 
-    cpu::execute_instruction(0);
+    let mut cpu = cpu::CPU::new(memory);
+
+    cpu.set_pc(elf.header.entry_addr);
+    cpu.execute_instruction();
 }

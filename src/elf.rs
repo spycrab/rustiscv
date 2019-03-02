@@ -13,7 +13,7 @@ pub struct Header {
     version: u8,
     obj_type: u16,
     arch: u16,
-    entry_addr: u32,
+    pub entry_addr: u32,
     sh_offset: u32,
     sh_entry_size: u16,
     sh_entry_count: u16,
@@ -148,7 +148,7 @@ named!(
 #[derive(Debug)]
 pub struct ELF {
     file: File,
-    header: Header,
+    pub header: Header,
     pub programs: Vec<Program>,
     pub sections: Vec<Section>,
 }
@@ -166,17 +166,17 @@ impl ELF {
 
         if !header.is_le {
             println!("ELF must be little endian!");
-            return Option::None;
+            return None;
         }
 
         if !header.is_32bit {
             println!("ELF must be 32-bit!");
-            return Option::None;
+            return None;
         }
 
         if header.version != 1 {
             println!("ELF must be version 1!");
-            return Option::None;
+            return None;
         }
 
         let mut elf: ELF = ELF {
@@ -243,7 +243,7 @@ impl ELF {
 
         println!("ELF parsed successfully.");
 
-        return Option::Some(elf);
+        return Some(elf);
     }
 
     #[allow(dead_code)]
@@ -273,7 +273,7 @@ impl ELF {
 
         self.file.read(&mut data).ok()?;
 
-        return Option::Some(data);
+        return Some(data);
     }
 
     pub fn extract_section(&mut self, section: Section) -> Option<Vec<u8>> {
@@ -287,6 +287,6 @@ impl ELF {
 
         self.file.read(&mut data).ok()?;
 
-        return Option::Some(data);
+        return Some(data);
     }
 }
