@@ -106,13 +106,13 @@ named!(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Section {
-    name_offset: u32,
-    section_type: u32,
-    flags: u32,
-    virt_addr: u32,
-    offset: u32,
-    size: u32,
-    align: u32,
+    pub name_offset: u32,
+    pub section_type: u32,
+    pub flags: u32,
+    pub virt_addr: u32,
+    pub offset: u32,
+    pub size: u32,
+    pub align: u32,
 }
 
 named!(
@@ -144,7 +144,7 @@ named!(
 pub struct ELF {
     file: File,
     header: Header,
-    programs: Vec<Program>,
+    pub programs: Vec<Program>,
     pub sections: Vec<Section>,
 }
 
@@ -207,7 +207,7 @@ impl ELF {
             elf.programs.push(program);
         }
 
-        // Parse sectors
+        // Parse sections
         elf.file
             .seek(SeekFrom::Start(elf.header.sh_offset.into()))
             .expect("Failed to seek sector entries");
@@ -220,14 +220,14 @@ impl ELF {
                 .expect("Failed to parse section header!")
                 .1;
 
-            println!("");
+            /*println!("");
             println!("Section {}:", i);
             println!("Name Offset: {:x}", section.name_offset);
             println!("Type: {:x}", section.section_type);
             println!("Flags: {:x}", section.flags);
             println!("Size: {:x}", section.size);
             println!("VirtAddr: {:x}", section.virt_addr);
-            println!("============\n");
+            println!("============\n");*/
 
             elf.sections.push(section);
         }

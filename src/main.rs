@@ -2,6 +2,7 @@
 extern crate nom;
 
 mod elf;
+mod memory;
 
 fn get_bits(input: u64, from: u8, to: u8) -> Option<u64> {
     if from > to || from == to || to > 63 {
@@ -42,6 +43,12 @@ fn main() {
     let mut elf = elf::ELF::parse(&elf_path).expect("Failed to parse ELF!");
 
     println!("Name: {}\n", elf.get_section_name(1).unwrap());
+
+    let mut memory = memory::Memory::new();
+
+    memory.reset();
+    memory.load_elf(&mut elf);
+    memory.read(0);
 
     execute_instruction(0);
 }
