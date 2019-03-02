@@ -39,7 +39,10 @@ fn main() {
 
     let elf_path = std::env::args().nth(1).expect("Too few arguments");
 
-    let _elf = elf::ELF::parse(&elf_path).expect("Failed to parse ELF!");
+    let mut elf = elf::ELF::parse(&elf_path).expect("Failed to parse ELF!");
+
+    
+    println!("Name: {}\n", elf.get_section_name(0).unwrap());
 
     execute_instruction(0);
 }
