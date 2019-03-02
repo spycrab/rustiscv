@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io::SeekFrom;
 use std::io::*;
 
+const LIST_PROGRAMS: bool = false;
+const LIST_SECTIONS: bool = false;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Header {
     is_32bit: bool,
@@ -70,13 +73,14 @@ named!(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program {
+    pub virt_addr: u32,
+    pub file_size: u32,
+    pub mem_size: u32,
+
     prog_type: u32,
     flags: u32,
     offset: u32,
-    virt_addr: u32,
     phys_addr: u32,
-    file_size: u32,
-    mem_size: u32,
     align: u32,
 }
 
@@ -106,13 +110,14 @@ named!(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Section {
-    pub name_offset: u32,
     pub section_type: u32,
     pub flags: u32,
     pub virt_addr: u32,
     pub offset: u32,
     pub size: u32,
     pub align: u32,
+
+    name_offset: u32,
 }
 
 named!(
@@ -194,15 +199,17 @@ impl ELF {
                 .expect("Failed to parse program header!")
                 .1;
 
-            println!("");
-            println!("Program {}:", i);
-            println!("Type: {:x}", program.prog_type);
-            println!("VirtAddr: {:x}", program.virt_addr);
-            println!("File Size: {:x}", program.file_size);
-            println!("Memory Size: {:x}", program.mem_size);
-            println!("Alignment: {:x}", program.align);
-            println!("Calc addr.: {:x}", program.offset % program.align);
-            println!("=============\n");
+            if LIST_PROGRAMS {
+                println!("");
+                println!("Program {}:", i);
+                println!("Type: {:x}", program.prog_type);
+                println!("VirtAddr: {:x}", program.virt_addr);
+                println!("File Size: {:x}", program.file_size);
+                println!("Memory Size: {:x}", program.mem_size);
+                println!("Alignment: {:x}", program.align);
+                println!("Calc addr.: {:x}", program.offset % program.align);
+                println!("=============\n");
+            }
 
             elf.programs.push(program);
         }
@@ -220,14 +227,16 @@ impl ELF {
                 .expect("Failed to parse section header!")
                 .1;
 
-            /*println!("");
-            println!("Section {}:", i);
-            println!("Name Offset: {:x}", section.name_offset);
-            println!("Type: {:x}", section.section_type);
-            println!("Flags: {:x}", section.flags);
-            println!("Size: {:x}", section.size);
-            println!("VirtAddr: {:x}", section.virt_addr);
-            println!("============\n");*/
+            if LIST_SECTIONS {
+                println!("");
+                println!("Section {}:", i);
+                println!("Name Offset: {:x}", section.name_offset);
+                println!("Type: {:x}", section.section_type);
+                println!("Flags: {:x}", section.flags);
+                println!("Size: {:x}", section.size);
+                println!("VirtAddr: {:x}", section.virt_addr);
+                println!("============\n");
+            }
 
             elf.sections.push(section);
         }
@@ -251,6 +260,20 @@ impl ELF {
         let null_offset = name.iter().position(|&x| x == 0).unwrap();
 
         return String::from_utf8(name[0..null_offset].to_vec()).ok();
+    }
+
+    pub fn extract_program(&mut self, program: Program) -> Option<Vec<u8>> {
+        let mut data: Vec<u8> = Vec::new();
+
+        self.file
+            .seek(SeekFrom::Start(program.offset.into()))
+            .ok()?;
+
+        data.resize(program.file_size as usize, 0);
+
+        self.file.read(&mut data).ok()?;
+
+        return Option::Some(data);
     }
 
     pub fn extract_section(&mut self, section: Section) -> Option<Vec<u8>> {

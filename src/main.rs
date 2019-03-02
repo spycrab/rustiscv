@@ -1,39 +1,9 @@
 // extern crate byteorder;
 extern crate nom;
 
+mod cpu;
 mod elf;
 mod memory;
-
-fn get_bits(input: u64, from: u8, to: u8) -> Option<u64> {
-    if from > to || from == to || to > 63 {
-        return Option::None;
-    }
-
-    let mut value: u64 = 0;
-
-    for i in from..to {
-        value |= input & (1 << i);
-    }
-
-    value >>= from;
-
-    return Option::Some(value);
-}
-
-fn execute_instruction(instruction: u32) -> bool {
-    let opcode = get_bits(instruction.into(), 0, 6).unwrap();
-    let _src1 = get_bits(instruction.into(), 1, 3).unwrap();
-
-    match opcode {
-        0x00 => {}
-        _ => {
-            println!("Unknown opcode 0x{:02x}", opcode);
-            return false;
-        }
-    }
-
-    return true;
-}
 
 fn main() {
     println!("Rustisc V");
@@ -42,13 +12,11 @@ fn main() {
 
     let mut elf = elf::ELF::parse(&elf_path).expect("Failed to parse ELF!");
 
-    println!("Name: {}\n", elf.get_section_name(1).unwrap());
-
     let mut memory = memory::Memory::new();
 
     memory.reset();
     memory.load_elf(&mut elf);
-    memory.read(0);
+    memory.read(0x10000);
 
-    execute_instruction(0);
+    cpu::execute_instruction(0);
 }
