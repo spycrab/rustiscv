@@ -1,20 +1,56 @@
 use crate::memory::Memory;
-use byteorder::{LittleEndian, ReadBytesExt};
 
-fn get_bits(input: u64, from: u8, to: u8) -> Option<u64> {
-    if from > to || from == to || to > 64 {
-        return None;
+use std::num::Wrapping;
+
+use byteorder::{LittleEndian, ReadBytesExt};
+use num::{FromPrimitive, Num};
+
+#[derive(Debug, Clone)]
+enum Opcode {
+    AUIPC = 0b0010111,
+    ADDI = 0b0010011,
+    ADD = 0b0110011,
+}
+
+fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
+    if from > to || from == to || to > std::mem::size_of::<T>() * 8 {
+        panic!("get_bits: Invalid parameters!");
     }
 
     let mut value: u64 = 0;
 
-    for i in from..to {
+    for i in from..=to {
         value |= input & (1 << i);
     }
 
     value >>= from;
 
-    return Some(value);
+    return T::from_u64(value).expect("get_bits: Cast to T failed!");
+}
+
+fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
+    if length > std::mem::size_of::<T>() * 8 {
+        panic!("sign_extend: Invalid parameters!");
+    }
+
+    let mut value = input;
+    let sign = (value & (1 << length)) >> length;
+
+    value ^= value & (1 << length);
+    value |= sign << (std::mem::size_of::<T>() * 8 - 1);
+
+    return T::from_usize(value).expect("sign_extend: Cast to T failed!");
+}
+
+fn to_opcode(value: u64) -> Option<Opcode> {
+    let opcodes = [Opcode::ADD, Opcode::ADDI, Opcode::AUIPC];
+
+    let opcode = opcodes
+        .iter()
+        .filter(|&opcode| value == opcode.clone() as u64)
+        .next();
+
+    return Some(opcode?.clone());
 }
 
 pub struct CPU {
@@ -44,7 +80,7 @@ impl CPU {
         return self.x[index as usize];
     }
 
-    fn register_write(&mut self, index: u64, value: u32) {
+    fn register_write(&mut self, index: u32, value: u32) {
         if index == 0 {
             return;
         }
@@ -70,24 +106,44 @@ impl CPU {
 
         let instruction: u32 = ins_u8.read_u32::<LittleEndian>().unwrap();
 
-        let opcode = get_bits(instruction.into(), 0, 6).unwrap();
-        let src1 = get_bits(instruction.into(), 15, 19).unwrap();
-        let src2 = get_bits(instruction.into(), 20, 24).unwrap();
-        let dst = get_bits(instruction.into(), 7, 11).unwrap();
+        let opcode_value = get_bits(instruction.into(), 0, 6);
+        let opcode = to_opcode(opcode_value)
+            .expect(format!("Unknown opcode {:07b}", opcode_value as u64).as_str());
+        let src1 = get_bits(instruction.into(), 15, 19);
+        let src2 = get_bits(instruction.into(), 20, 24);
+        let dst = get_bits(instruction.into(), 7, 11);
+
+        println!("{:?}", opcode);
 
         match opcode {
-            0b0110011 => {
-                // ADD
+            Opcode::AUIPC => {
                 self.register_write(
-                    self.register_read(dst).into(),
-                    self.register_read(src1) + self.register_read(src2),
+                    dst,
+                    (Wrapping(self.pc)
+                        + Wrapping(get_bits::<u32>(instruction.into(), 12, 31) << 11))
+                    .0,
                 );
             }
-            _ => {
-                println!("Unknown opcode 0x{:02x}", opcode);
-                return false;
+            Opcode::ADDI => {
+                self.register_write(
+                    dst,
+                    (Wrapping(self.register_read(src1))
+                        + Wrapping(sign_extend::<u32>(
+                            get_bits::<u32>(instruction.into(), 12, 31) as usize,
+                            12,
+                        )))
+                    .0,
+                );
+            }
+            Opcode::ADD => {
+                self.register_write(
+                    dst,
+                    (Wrapping(self.register_read(src1)) + Wrapping(self.register_read(src2))).0,
+                );
             }
         }
+
+        self.pc += 4;
 
         return true;
     }
