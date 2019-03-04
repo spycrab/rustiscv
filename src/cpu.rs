@@ -8,8 +8,11 @@ use num::{FromPrimitive, Num};
 #[derive(Debug, Clone)]
 enum Opcode {
     AUIPC = 0b0010111,
-    ADDI = 0b0010011,
-    ADD = 0b0110011,
+    ImmOps = 0b0010011,
+    RegOps = 0b0110011,
+    JAL = 0b1101111,
+    JALR = 0b1100111,
+    CondJumps = 0b1100011,
 }
 
 fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
@@ -36,14 +39,18 @@ fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
     let mut value = input;
     let sign = (value & (1 << length)) >> length;
 
-    value ^= value & (1 << length);
-    value |= sign << (std::mem::size_of::<T>() * 8 - 1);
+    value &= !(1 << length);
+
+    for i in (length + 1)..=((std::mem::size_of::<T>() * 8) - 1) {
+        value |= sign << i;
+    }
 
     return T::from_usize(value).expect("sign_extend: Cast to T failed!");
 }
 
 fn to_opcode(value: u64) -> Option<Opcode> {
-    let opcodes = [Opcode::ADD, Opcode::ADDI, Opcode::AUIPC];
+    use Opcode::*;
+    let opcodes = [ImmOps, AUIPC, RegOps, JAL, JALR, CondJumps];
 
     let opcode = opcodes
         .iter()
@@ -73,7 +80,7 @@ impl CPU {
             return 0;
         }
 
-        if index > 32 {
+        if index > 31 {
             panic!("Index out of range!");
         }
 
@@ -103,43 +110,140 @@ impl CPU {
             self.memory.read((self.pc + 2).into()),
             self.memory.read((self.pc + 3).into()),
         ];
-
         let instruction: u32 = ins_u8.read_u32::<LittleEndian>().unwrap();
 
         let opcode_value = get_bits(instruction.into(), 0, 6);
-        let opcode = to_opcode(opcode_value)
-            .expect(format!("Unknown opcode {:07b}", opcode_value as u64).as_str());
+        let opcode = to_opcode(opcode_value).expect(
+            format!(
+                "Unknown opcode {:07b} @ {:08x}",
+                opcode_value as u64, self.pc
+            )
+            .as_str(),
+        );
         let src1 = get_bits(instruction.into(), 15, 19);
         let src2 = get_bits(instruction.into(), 20, 24);
         let dst = get_bits(instruction.into(), 7, 11);
 
-        println!("{:?}", opcode);
+        println!("{:08x} {:?}", self.pc, opcode);
 
         match opcode {
             Opcode::AUIPC => {
                 self.register_write(
                     dst,
-                    (Wrapping(self.pc)
-                        + Wrapping(get_bits::<u32>(instruction.into(), 12, 31) << 11))
-                    .0,
+                    self.pc
+                        .wrapping_add(get_bits::<u32>(instruction.into(), 12, 31) << 11),
                 );
             }
-            Opcode::ADDI => {
-                self.register_write(
-                    dst,
-                    (Wrapping(self.register_read(src1))
-                        + Wrapping(sign_extend::<u32>(
-                            get_bits::<u32>(instruction.into(), 12, 31) as usize,
-                            12,
-                        )))
-                    .0,
-                );
+            Opcode::ImmOps => {
+                let op = get_bits::<u32>(instruction.into(), 12, 14);
+                let imm = get_bits::<u32>(instruction.into(), 12, 31);
+                match op {
+                    0b000 => {
+                        println!("ADDI");
+                        self.register_write(
+                            dst,
+                            self.register_read(src1)
+                                .wrapping_add(sign_extend::<u32>(imm as usize, 10)),
+                        );
+                    }
+                    0b001 => {
+                        println!("SLLI");
+                        self.register_write(
+                            dst,
+                            self.register_read(src1) << get_bits::<u32>(instruction.into(), 20, 24),
+                        );
+                    }
+                    0b111 => {
+                        println!("ANDI");
+                        self.register_write(dst, self.register_read(src1) & imm);
+                    }
+                    _ => {
+                        panic!(format!(
+                            "Unknown subtype of immediate operation: {:03b}",
+                            op
+                        ));
+                    }
+                }
             }
-            Opcode::ADD => {
-                self.register_write(
-                    dst,
-                    (Wrapping(self.register_read(src1)) + Wrapping(self.register_read(src2))).0,
-                );
+            Opcode::RegOps => {
+                let op = get_bits::<u32>(instruction.into(), 25, 31);
+                match op {
+                    0b0000000 => {
+                        println!("ADD");
+                        self.register_write(
+                            dst,
+                            self.register_read(src1)
+                                .wrapping_add(self.register_read(src2)),
+                        );
+                    }
+                    0b0100000 => {
+                        println!("SUB");
+                        self.register_write(
+                            dst,
+                            self.register_read(src1)
+                                .wrapping_sub(self.register_read(src2)),
+                        );
+                    }
+                    _ => {
+                        panic!(format!("Unknown subtype of register operation: {:06b}", op));
+                    }
+                }
+            }
+            Opcode::JALR => {
+                let imm =
+                    sign_extend::<u32>(get_bits::<u32>(instruction.into(), 21, 31) as usize, 10);
+
+                self.register_write(dst, self.pc + 4);
+                self.pc = self.register_read(src1).wrapping_add(imm) & !1;
+                return true;
+            }
+            Opcode::JAL => {
+                self.register_write(dst, self.pc + 4);
+                self.pc = self.pc.wrapping_add(sign_extend::<u32>(
+                    get_bits::<u32>(instruction.into(), 21, 31).wrapping_mul(2) as usize,
+                    10,
+                ));
+                return true;
+            }
+            Opcode::CondJumps => {
+                let op = get_bits::<u32>(instruction.into(), 12, 14);
+                let branch;
+                match op {
+                    0b001 => {
+                        println!("BNE");
+                        branch = self.register_read(src1) != self.register_read(src2);
+                    }
+                    0b110 => {
+                        println!("BLTU");
+                        branch = self.register_read(src1) < self.register_read(src2);
+                    }
+                    0b111 => {
+                        println!("BGEU");
+                        branch = self.register_read(src1) >= self.register_read(src2);
+                    }
+                    _ => {
+                        panic!(format!("Unknown subtype of conditional jump: {:03b}", op));
+                    }
+                }
+
+                if branch {
+                    let offset = get_bits::<u32>(instruction.into(), 25, 31) << 5
+                        | get_bits::<u32>(instruction.into(), 7, 11);
+                    println!("Offset {:x}", offset);
+                    println!("Ins: {:032b}", instruction);
+                    self.register_write(dst, self.pc + 4);
+                    // Something wrong here. Bad bit order?
+                    // Ex. 00000010110000110111111001100011
+                    // 8-11:  Bits 1-4
+                    // 25-30: Bits 5-10
+                    // 7:     Bit 11
+                    // 31:    Bit 12
+                    println!("ABOUT TO TAKE A WRONG TURN");
+                    self.pc = self
+                        .pc
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11));
+                    return true;
+                }
             }
         }
 

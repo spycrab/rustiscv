@@ -59,7 +59,7 @@ impl Memory {
             .iter()
             .filter(|range| range.contains(address))
             .next()
-            .expect("Bad memory access!");
+            .expect(format!("Bad memory access @ {:x}", address).as_str());
         return range.read(address).clone();
     }
 
