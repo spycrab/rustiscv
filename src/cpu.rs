@@ -16,7 +16,7 @@ enum Opcode {
 }
 
 fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
-    if from > to || from == to || to > std::mem::size_of::<T>() * 8 {
+    if from > to || to > std::mem::size_of::<T>() * 8 {
         panic!("get_bits: Invalid parameters!");
     }
 
@@ -227,21 +227,17 @@ impl CPU {
                 }
 
                 if branch {
-                    let offset = get_bits::<u32>(instruction.into(), 25, 31) << 5
-                        | get_bits::<u32>(instruction.into(), 7, 11);
-                    println!("Offset {:x}", offset);
+                    let offset = get_bits::<u32>(instruction.into(), 31, 31) << 11
+                        | get_bits::<u32>(instruction.into(), 7, 7) << 10
+                        | get_bits::<u32>(instruction.into(), 25, 30) << 4
+                        | get_bits::<u32>(instruction.into(), 8, 11);
+                    println!("Offset {:012b}", offset);
                     println!("Ins: {:032b}", instruction);
                     self.register_write(dst, self.pc + 4);
-                    // Something wrong here. Bad bit order?
-                    // Ex. 00000010110000110111111001100011
-                    // 8-11:  Bits 1-4
-                    // 25-30: Bits 5-10
-                    // 7:     Bit 11
-                    // 31:    Bit 12
-                    println!("ABOUT TO TAKE A WRONG TURN");
+
                     self.pc = self
                         .pc
-                        .wrapping_add(sign_extend::<u32>(offset as usize, 11));
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
                     return true;
                 }
             }
