@@ -104,13 +104,8 @@ impl CPU {
     }
 
     pub fn execute_instruction(&mut self) -> bool {
-        let mut ins_u8: &[u8] = &[
-            self.memory.read(self.pc.into()),
-            self.memory.read((self.pc + 1).into()),
-            self.memory.read((self.pc + 2).into()),
-            self.memory.read((self.pc + 3).into()),
-        ];
-        let instruction: u32 = ins_u8.read_u32::<LittleEndian>().unwrap();
+        let ins_u8 = self.memory.read_range(self.pc.into(), 4);
+        let instruction = ins_u8.as_slice().read_u32::<LittleEndian>().unwrap();
 
         let opcode_value = get_bits(instruction.into(), 0, 6);
         let opcode = to_opcode(opcode_value).expect(
@@ -131,19 +126,32 @@ impl CPU {
                 self.register_write(
                     dst,
                     self.pc
-                        .wrapping_add(get_bits::<u32>(instruction.into(), 12, 31) << 11),
+                        .wrapping_add(get_bits::<u32>(instruction.into(), 12, 31) << 12),
+                );
+                println!(
+                    "AUIPC: x{} = {:x} + {:x}",
+                    dst,
+                    get_bits::<u32>(instruction.into(), 12, 31) << 12,
+                    self.pc
                 );
             }
             Opcode::ImmOps => {
                 let op = get_bits::<u32>(instruction.into(), 12, 14);
-                let imm = get_bits::<u32>(instruction.into(), 12, 31);
+                let imm = get_bits::<u32>(instruction.into(), 20, 31);
                 match op {
                     0b000 => {
                         println!("ADDI");
+                        println!(
+                            "ADDI: x{} = {:x} + {:x}",
+                            dst,
+                            self.register_read(src1),
+                            sign_extend::<u32>(imm as usize, 11)
+                        );
+
                         self.register_write(
                             dst,
                             self.register_read(src1)
-                                .wrapping_add(sign_extend::<u32>(imm as usize, 10)),
+                                .wrapping_add(sign_extend::<u32>(imm as usize, 11)),
                         );
                     }
                     0b001 => {
@@ -169,6 +177,15 @@ impl CPU {
                 let op = get_bits::<u32>(instruction.into(), 25, 31);
                 match op {
                     0b0000000 => {
+                        println!(
+                            "x{} = x{} + x{} = {:x} + {:x} = {:x}",
+                            dst,
+                            src1,
+                            src2,
+                            self.register_read(src1),
+                            self.register_read(src2),
+                            self.register_read(src1) + self.register_read(src2)
+                        );
                         println!("ADD");
                         self.register_write(
                             dst,
@@ -178,6 +195,15 @@ impl CPU {
                     }
                     0b0100000 => {
                         println!("SUB");
+                        println!(
+                            "x{} = x{} - x{} = {:x} - {:x} = {:x}",
+                            dst,
+                            src1,
+                            src2,
+                            self.register_read(src1),
+                            self.register_read(src2),
+                            self.register_read(src1) - self.register_read(src2)
+                        );
                         self.register_write(
                             dst,
                             self.register_read(src1)
@@ -191,7 +217,10 @@ impl CPU {
             }
             Opcode::JALR => {
                 let imm =
-                    sign_extend::<u32>(get_bits::<u32>(instruction.into(), 21, 31) as usize, 10);
+                    sign_extend::<u32>(get_bits::<u32>(instruction.into(), 20, 31) as usize, 11);
+
+                println!("IMM: {}", imm);
+                println!("x{}: {:x}", src1, self.register_read(src1));
 
                 self.register_write(dst, self.pc + 4);
                 self.pc = self.register_read(src1).wrapping_add(imm) & !1;

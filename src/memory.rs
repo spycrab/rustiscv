@@ -53,6 +53,17 @@ impl Memory {
         return Memory { ranges: Vec::new() };
     }
 
+    pub fn read_range(&self, address: u64, length: u64) -> Vec<u8>
+    {
+        let mut data = Vec::new();
+
+        for i in 0..length {
+           data.push(self.read(address + i));
+        }
+
+        return data;
+    }
+
     pub fn read(&self, address: u64) -> u8 {
         let range = self
             .ranges
