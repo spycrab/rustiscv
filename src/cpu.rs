@@ -123,7 +123,7 @@ impl CPU {
 
                 self.memory.write_range(
                     self.register_read(ins.src1()).wrapping_add(offset).into(),
-                    buf.get_mut().clone(),
+                    &buf.get_mut().clone(),
                 );
             }
             Opcode::ADD => {

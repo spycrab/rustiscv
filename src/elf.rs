@@ -178,7 +178,7 @@ impl ELF {
             return None;
         }
 
-        let mut elf: ELF = ELF {
+        let mut elf = ELF {
             file,
             header,
             programs: vec![],
@@ -251,7 +251,7 @@ impl ELF {
             .get(self.header.sh_str_index as usize)?
             .clone();
 
-        let data = self.extract_section(string_section)?;
+        let data = self.extract_section(&string_section)?;
 
         let name = &data[self.sections.get(index)?.name_offset as usize..];
 
@@ -260,7 +260,7 @@ impl ELF {
         String::from_utf8(name[0..null_offset].to_vec()).ok()
     }
 
-    pub fn extract_program(&mut self, program: Program) -> Option<Vec<u8>> {
+    pub fn extract_program(&mut self, program: &Program) -> Option<Vec<u8>> {
         let mut data: Vec<u8> = vec![];
 
         self.file
@@ -274,7 +274,7 @@ impl ELF {
         Some(data)
     }
 
-    pub fn extract_section(&mut self, section: Section) -> Option<Vec<u8>> {
+    pub fn extract_section(&mut self, section: &Section) -> Option<Vec<u8>> {
         let mut data: Vec<u8> = vec![];
 
         self.file

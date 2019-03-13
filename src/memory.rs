@@ -63,7 +63,7 @@ impl Memory {
         data
     }
 
-    pub fn write_range(&mut self, address: u64, data: Vec<u8>) {
+    pub fn write_range(&mut self, address: u64, data: &[u8]) {
         for i in 0..data.len() {
             self.write(
                 address + i as u64,
@@ -130,7 +130,7 @@ impl Memory {
                 from: section.virt_addr.into(),
                 to: (section.virt_addr + section.size).into(),
                 flags: (section.flags & 0x01) | (section.flags & 0x04),
-                data: elf.extract_section(section.clone()).unwrap(),
+                data: elf.extract_section(&section).unwrap(),
                 name: elf.section_name(index).unwrap(),
             };
 
@@ -143,7 +143,7 @@ impl Memory {
         let programs = elf.programs.clone();
 
         for program in &programs {
-            let mut data = elf.extract_program(program.clone()).unwrap();
+            let mut data = elf.extract_program(&program).unwrap();
             data.resize(program.mem_size as usize, 0);
 
             let range = Range {
