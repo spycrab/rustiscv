@@ -1,7 +1,7 @@
 use num::{FromPrimitive, Num};
 
 pub fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
-    if from > to || to > std::mem::size_of::<T>() * 8 {
+    if from > to || to >= std::mem::size_of::<T>() * 8 {
         panic!("get_bits: Invalid parameters!");
     }
 
@@ -13,11 +13,11 @@ pub fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T
 
     value >>= from;
 
-    return T::from_u64(value).expect("get_bits: Cast to T failed!");
+    T::from_u64(value).expect("get_bits: Cast to T failed!")
 }
 
 pub fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
-    if length > std::mem::size_of::<T>() * 8 {
+    if length >= std::mem::size_of::<T>() * 8 {
         panic!("sign_extend: Invalid parameters!");
     }
 
@@ -30,5 +30,5 @@ pub fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
         value |= sign << i;
     }
 
-    return T::from_usize(value).expect("sign_extend: Cast to T failed!");
+    T::from_usize(value).expect("sign_extend: Cast to T failed!")
 }

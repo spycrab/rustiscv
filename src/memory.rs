@@ -15,12 +15,12 @@ struct Range {
 
 impl Range {
     pub fn contains(&self, address: u64) -> bool {
-        return self.from <= address && address <= self.to;
+        self.from <= address && address <= self.to
     }
 
     pub fn read(&self, address: u64) -> &u8 {
         let offset = address - self.from;
-        return self.data.get(offset as usize).expect("Read failed");
+        self.data.get(offset as usize).expect("Read failed")
     }
 
     pub fn write(&mut self, address: u64, value: u8) {
@@ -32,15 +32,15 @@ impl Range {
     }
 
     pub fn can_exec(&self) -> bool {
-        return self.flags & Flags::Executable as u32 != 0;
+        self.flags & Flags::Executable as u32 != 0
     }
 
     pub fn can_write(&self) -> bool {
-        return self.flags & Flags::Writeable as u32 != 0;
+        self.flags & Flags::Writeable as u32 != 0
     }
 
     pub fn name(&self) -> &str {
-        return self.name.as_str();
+        self.name.as_str()
     }
 }
 
@@ -50,7 +50,7 @@ pub struct Memory {
 
 impl Memory {
     pub fn new() -> Memory {
-        return Memory { ranges: Vec::new() };
+        Memory { ranges: Vec::new() }
     }
 
     pub fn read_range(&self, address: u64, length: u64) -> Vec<u8> {
@@ -60,7 +60,7 @@ impl Memory {
             data.push(self.read(address + i));
         }
 
-        return data;
+        data
     }
 
     pub fn write_range(&mut self, address: u64, data: Vec<u8>) {
@@ -72,22 +72,30 @@ impl Memory {
         }
     }
 
-    pub fn read(&self, address: u64) -> u8 {
-        let range = self
-            .ranges
+    fn get_range(&self, address: u64) -> Option<&Range> {
+        self.ranges
             .iter()
             .filter(|range| range.contains(address))
             .next()
+    }
+
+    fn get_range_mut(&mut self, address: u64) -> Option<&mut Range> {
+        self.ranges
+            .iter_mut()
+            .filter(|range| range.contains(address))
+            .next()
+    }
+
+    pub fn read(&self, address: u64) -> u8 {
+        let range = self
+            .get_range(address)
             .expect(format!("Bad read attempt: {:x}", address).as_str());
-        return range.read(address).clone();
+        range.read(address).clone()
     }
 
     pub fn write(&mut self, address: u64, value: u8) {
         let range = self
-            .ranges
-            .iter_mut()
-            .filter(|range| range.contains(address))
-            .next()
+            .get_range_mut(address)
             .expect(format!("Bad write attempt: {:x}", address).as_str());
 
         range.write(address, value);
@@ -95,22 +103,18 @@ impl Memory {
 
     pub fn exec_at(&self, address: u64) -> bool {
         let range = self
-            .ranges
-            .iter()
-            .filter(|range| range.contains(address))
-            .next()
+            .get_range(address)
             .expect(format!("Bad executable check: {:x}", address).as_str());
-        return range.can_exec();
+
+        range.can_exec()
     }
 
     pub fn name_at(&self, address: u64) -> &str {
         let range = self
-            .ranges
-            .iter()
-            .filter(|range| range.contains(address))
-            .next()
+            .get_range(address)
             .expect(format!("Bad executable check: {:x}", address).as_str());
-        return range.name();
+
+        range.name()
     }
 
     pub fn reset(&mut self) {

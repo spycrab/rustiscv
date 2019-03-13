@@ -145,7 +145,6 @@ named!(
     )
 );
 
-#[derive(Debug)]
 pub struct ELF {
     file: File,
     pub header: Header,
@@ -243,7 +242,7 @@ impl ELF {
 
         println!("ELF parsed successfully.");
 
-        return Some(elf);
+        Some(elf)
     }
 
     pub fn section_name(&mut self, index: usize) -> Option<String> {
@@ -258,7 +257,7 @@ impl ELF {
 
         let null_offset = name.iter().position(|&x| x == 0).unwrap();
 
-        return String::from_utf8(name[0..null_offset].to_vec()).ok();
+        String::from_utf8(name[0..null_offset].to_vec()).ok()
     }
 
     pub fn extract_program(&mut self, program: Program) -> Option<Vec<u8>> {
@@ -272,7 +271,7 @@ impl ELF {
 
         self.file.read(&mut data).ok()?;
 
-        return Some(data);
+        Some(data)
     }
 
     pub fn extract_section(&mut self, section: Section) -> Option<Vec<u8>> {
@@ -286,6 +285,6 @@ impl ELF {
 
         self.file.read(&mut data).ok()?;
 
-        return Some(data);
+        Some(data)
     }
 }

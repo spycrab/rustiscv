@@ -13,11 +13,11 @@ pub struct CPU {
 
 impl CPU {
     pub fn new(memory: Memory) -> CPU {
-        return CPU {
+        CPU {
             x: [0; 32],
             pc: 0,
             memory: memory,
-        };
+        }
     }
 
     fn register_read(&self, index: u32) -> u32 {
@@ -29,7 +29,7 @@ impl CPU {
             panic!("Index out of range!");
         }
 
-        return self.x[index as usize];
+        self.x[index as usize]
     }
 
     fn register_write(&mut self, index: u32, value: u32) {
@@ -57,7 +57,12 @@ impl CPU {
 
         let ins = Instruction::new(ins_u32);
 
-        println!("{} {:08x} {}", self.memory.name_at(self.pc.into()), self.pc, ins.to_string());
+        println!(
+            "{} {:08x} {}",
+            self.memory.name_at(self.pc.into()),
+            self.pc,
+            ins.to_string()
+        );
 
         match ins.opcode() {
             Opcode::AUIPC => {
@@ -165,6 +170,7 @@ impl CPU {
 
                 self.register_write(ins.dst(), self.pc + 4);
                 self.pc = self.register_read(ins.src1()).wrapping_add(imm) & !1;
+
                 return true;
             }
             Opcode::JAL => {
@@ -234,6 +240,6 @@ impl CPU {
 
         self.pc += 4;
 
-        return true;
+        true
     }
 }
