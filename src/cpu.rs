@@ -1,64 +1,9 @@
+use crate::bin::*;
+use crate::instruction::*;
 use crate::memory::Memory;
 
-use std::num::Wrapping;
-
-use byteorder::{LittleEndian, ReadBytesExt};
-use num::{FromPrimitive, Num};
-
-#[derive(Debug, Clone)]
-enum Opcode {
-    AUIPC = 0b0010111,
-    ImmOps = 0b0010011,
-    RegOps = 0b0110011,
-    JAL = 0b1101111,
-    JALR = 0b1100111,
-    CondJumps = 0b1100011,
-}
-
-fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
-    if from > to || to > std::mem::size_of::<T>() * 8 {
-        panic!("get_bits: Invalid parameters!");
-    }
-
-    let mut value: u64 = 0;
-
-    for i in from..=to {
-        value |= input & (1 << i);
-    }
-
-    value >>= from;
-
-    return T::from_u64(value).expect("get_bits: Cast to T failed!");
-}
-
-fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
-    if length > std::mem::size_of::<T>() * 8 {
-        panic!("sign_extend: Invalid parameters!");
-    }
-
-    let mut value = input;
-    let sign = (value & (1 << length)) >> length;
-
-    value &= !(1 << length);
-
-    for i in (length + 1)..=((std::mem::size_of::<T>() * 8) - 1) {
-        value |= sign << i;
-    }
-
-    return T::from_usize(value).expect("sign_extend: Cast to T failed!");
-}
-
-fn to_opcode(value: u64) -> Option<Opcode> {
-    use Opcode::*;
-    let opcodes = [ImmOps, AUIPC, RegOps, JAL, JALR, CondJumps];
-
-    let opcode = opcodes
-        .iter()
-        .filter(|&opcode| value == opcode.clone() as u64)
-        .next();
-
-    return Some(opcode?.clone());
-}
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::Cursor;
 
 pub struct CPU {
     x: [u32; 32],
@@ -75,7 +20,7 @@ impl CPU {
         };
     }
 
-    fn register_read(&self, index: u64) -> u32 {
+    fn register_read(&self, index: u32) -> u32 {
         if index == 0 {
             return 0;
         }
@@ -104,171 +49,186 @@ impl CPU {
     }
 
     pub fn execute_instruction(&mut self) -> bool {
+        if !self.memory.exec_at(self.pc.into()) {
+            panic!("Program jumped to non-executable memory!");
+        }
         let ins_u8 = self.memory.read_range(self.pc.into(), 4);
-        let instruction = ins_u8.as_slice().read_u32::<LittleEndian>().unwrap();
+        let ins_u32 = ins_u8.as_slice().read_u32::<LittleEndian>().unwrap();
 
-        let opcode_value = get_bits(instruction.into(), 0, 6);
-        let opcode = to_opcode(opcode_value).expect(
-            format!(
-                "Unknown opcode {:07b} @ {:08x}",
-                opcode_value as u64, self.pc
-            )
-            .as_str(),
-        );
-        let src1 = get_bits(instruction.into(), 15, 19);
-        let src2 = get_bits(instruction.into(), 20, 24);
-        let dst = get_bits(instruction.into(), 7, 11);
+        let ins = Instruction::new(ins_u32);
 
-        println!("{:08x} {:?}", self.pc, opcode);
+        println!("{} {:08x} {}", self.memory.name_at(self.pc.into()), self.pc, ins.to_string());
 
-        match opcode {
+        match ins.opcode() {
             Opcode::AUIPC => {
-                self.register_write(
-                    dst,
-                    self.pc
-                        .wrapping_add(get_bits::<u32>(instruction.into(), 12, 31) << 12),
-                );
+                self.register_write(ins.dst(), self.pc.wrapping_add(ins.imm() << 12));
                 println!(
                     "AUIPC: x{} = {:x} + {:x}",
-                    dst,
-                    get_bits::<u32>(instruction.into(), 12, 31) << 12,
+                    ins.dst(),
+                    ins.imm() << 12,
                     self.pc
                 );
             }
-            Opcode::ImmOps => {
-                let op = get_bits::<u32>(instruction.into(), 12, 14);
-                let imm = get_bits::<u32>(instruction.into(), 20, 31);
-                match op {
-                    0b000 => {
-                        println!("ADDI");
-                        println!(
-                            "ADDI: x{} = {:x} + {:x}",
-                            dst,
-                            self.register_read(src1),
-                            sign_extend::<u32>(imm as usize, 11)
-                        );
-
-                        self.register_write(
-                            dst,
-                            self.register_read(src1)
-                                .wrapping_add(sign_extend::<u32>(imm as usize, 11)),
-                        );
-                    }
-                    0b001 => {
-                        println!("SLLI");
-                        self.register_write(
-                            dst,
-                            self.register_read(src1) << get_bits::<u32>(instruction.into(), 20, 24),
-                        );
-                    }
-                    0b111 => {
-                        println!("ANDI");
-                        self.register_write(dst, self.register_read(src1) & imm);
-                    }
-                    _ => {
-                        panic!(format!(
-                            "Unknown subtype of immediate operation: {:03b}",
-                            op
-                        ));
-                    }
-                }
+            Opcode::LUI => {
+                self.register_write(ins.dst(), ins.imm() << 12);
             }
-            Opcode::RegOps => {
-                let op = get_bits::<u32>(instruction.into(), 25, 31);
-                match op {
-                    0b0000000 => {
-                        println!(
-                            "x{} = x{} + x{} = {:x} + {:x} = {:x}",
-                            dst,
-                            src1,
-                            src2,
-                            self.register_read(src1),
-                            self.register_read(src2),
-                            self.register_read(src1) + self.register_read(src2)
-                        );
-                        println!("ADD");
-                        self.register_write(
-                            dst,
-                            self.register_read(src1)
-                                .wrapping_add(self.register_read(src2)),
-                        );
-                    }
-                    0b0100000 => {
-                        println!("SUB");
-                        println!(
-                            "x{} = x{} - x{} = {:x} - {:x} = {:x}",
-                            dst,
-                            src1,
-                            src2,
-                            self.register_read(src1),
-                            self.register_read(src2),
-                            self.register_read(src1) - self.register_read(src2)
-                        );
-                        self.register_write(
-                            dst,
-                            self.register_read(src1)
-                                .wrapping_sub(self.register_read(src2)),
-                        );
-                    }
-                    _ => {
-                        panic!(format!("Unknown subtype of register operation: {:06b}", op));
-                    }
-                }
+            Opcode::ADDI => {
+                let imm = ins.imm();
+
+                self.register_write(
+                    ins.dst(),
+                    self.register_read(ins.src1())
+                        .wrapping_add(sign_extend::<u32>(imm as usize, 11)),
+                );
+            }
+            Opcode::SLLI => {
+                let imm = ins.imm();
+                self.register_write(ins.dst(), self.register_read(ins.src1()) << imm);
+            }
+            Opcode::ANDI => {
+                let imm = ins.imm();
+                self.register_write(ins.dst(), self.register_read(ins.src1()) & imm);
+            }
+            Opcode::LW => {
+                let offset = sign_extend::<u32>(ins.imm() as usize, 11);
+                let range = self.memory.read_range(
+                    (offset as u64).wrapping_add(self.register_read(ins.src1()).into()),
+                    4,
+                );
+                self.register_write(
+                    ins.dst(),
+                    range.as_slice().read_u32::<LittleEndian>().unwrap(),
+                );
+            }
+            Opcode::SB => {
+                let offset = sign_extend(ins.imm() as usize, 11);
+                let value = self.register_read(ins.src2()) as u8;
+
+                self.memory.write(
+                    self.register_read(ins.src1()).wrapping_add(offset).into(),
+                    value,
+                );
+            }
+            Opcode::SW => {
+                let offset = sign_extend(ins.imm() as usize, 11);
+                let value = self.register_read(ins.src2());
+                let mut buf = Cursor::new(vec![]);
+
+                buf.write_u32::<LittleEndian>(value).unwrap();
+
+                self.memory.write_range(
+                    self.register_read(ins.src1()).wrapping_add(offset).into(),
+                    buf.get_mut().clone(),
+                );
+            }
+            Opcode::ADD => {
+                println!(
+                    "x{} = x{} + x{} = {:x} + {:x} = {:x}",
+                    ins.dst(),
+                    ins.src1(),
+                    ins.src2(),
+                    self.register_read(ins.src1()),
+                    self.register_read(ins.src2()),
+                    self.register_read(ins.src1())
+                        .wrapping_add(self.register_read(ins.src2()))
+                );
+                self.register_write(
+                    ins.dst(),
+                    self.register_read(ins.src1())
+                        .wrapping_add(self.register_read(ins.src2())),
+                );
+            }
+            Opcode::SUB => {
+                println!(
+                    "x{} = x{} - x{} = {:x} - {:x} = {:x}",
+                    ins.dst(),
+                    ins.src1(),
+                    ins.src2(),
+                    self.register_read(ins.src1()),
+                    self.register_read(ins.src2()),
+                    self.register_read(ins.src1())
+                        .wrapping_sub(self.register_read(ins.src2()))
+                );
+                self.register_write(
+                    ins.dst(),
+                    self.register_read(ins.src1())
+                        .wrapping_sub(self.register_read(ins.src2())),
+                );
             }
             Opcode::JALR => {
-                let imm =
-                    sign_extend::<u32>(get_bits::<u32>(instruction.into(), 20, 31) as usize, 11);
+                let mut imm = sign_extend::<u32>(ins.imm() as usize, 11);
 
-                println!("IMM: {}", imm);
-                println!("x{}: {:x}", src1, self.register_read(src1));
+                imm = ((imm as i32) >> 5) as u32;
 
-                self.register_write(dst, self.pc + 4);
-                self.pc = self.register_read(src1).wrapping_add(imm) & !1;
+                println!("IMM: {:x}", imm);
+                println!("x{}: {:x}", ins.src1(), self.register_read(ins.src1()));
+
+                self.register_write(ins.dst(), self.pc + 4);
+                self.pc = self.register_read(ins.src1()).wrapping_add(imm) & !1;
                 return true;
             }
             Opcode::JAL => {
-                self.register_write(dst, self.pc + 4);
-                self.pc = self.pc.wrapping_add(sign_extend::<u32>(
-                    get_bits::<u32>(instruction.into(), 21, 31).wrapping_mul(2) as usize,
-                    10,
-                ));
+                self.register_write(ins.dst(), self.pc + 4);
+                self.pc = self
+                    .pc
+                    .wrapping_add(sign_extend::<u32>(ins.imm().wrapping_mul(2) as usize, 10));
                 return true;
             }
-            Opcode::CondJumps => {
-                let op = get_bits::<u32>(instruction.into(), 12, 14);
-                let branch;
-                match op {
-                    0b001 => {
-                        println!("BNE");
-                        branch = self.register_read(src1) != self.register_read(src2);
-                    }
-                    0b110 => {
-                        println!("BLTU");
-                        branch = self.register_read(src1) < self.register_read(src2);
-                    }
-                    0b111 => {
-                        println!("BGEU");
-                        branch = self.register_read(src1) >= self.register_read(src2);
-                    }
-                    _ => {
-                        panic!(format!("Unknown subtype of conditional jump: {:03b}", op));
-                    }
-                }
+            Opcode::BNE => {
+                let branch = self.register_read(ins.src1()) != self.register_read(ins.src2());
 
                 if branch {
-                    let offset = get_bits::<u32>(instruction.into(), 31, 31) << 11
-                        | get_bits::<u32>(instruction.into(), 7, 7) << 10
-                        | get_bits::<u32>(instruction.into(), 25, 30) << 4
-                        | get_bits::<u32>(instruction.into(), 8, 11);
-                    println!("Offset {:012b}", offset);
-                    println!("Ins: {:032b}", instruction);
-                    self.register_write(dst, self.pc + 4);
+                    let offset = ins.imm();
+                    self.register_write(ins.dst(), self.pc + 4);
 
                     self.pc = self
                         .pc
                         .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
                     return true;
                 }
+            }
+            Opcode::BLT => {
+                let branch = (self.register_read(ins.src1()) as i32)
+                    < (self.register_read(ins.src2()) as i32);
+
+                if branch {
+                    let offset = ins.imm();
+                    self.register_write(ins.dst(), self.pc + 4);
+
+                    self.pc = self
+                        .pc
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
+                    return true;
+                }
+            }
+            Opcode::BLTU => {
+                let branch = self.register_read(ins.src1()) < self.register_read(ins.src2());
+
+                if branch {
+                    let offset = ins.imm();
+                    self.register_write(ins.dst(), self.pc + 4);
+
+                    self.pc = self
+                        .pc
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
+                    return true;
+                }
+            }
+            Opcode::BGEU => {
+                let branch = self.register_read(ins.src1()) >= self.register_read(ins.src2());
+
+                if branch {
+                    let offset = ins.imm();
+                    self.register_write(ins.dst(), self.pc + 4);
+
+                    self.pc = self
+                        .pc
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
+                    return true;
+                }
+            }
+            _ => {
+                panic!("Unimplemented!");
             }
         }
 

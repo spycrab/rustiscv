@@ -39,7 +39,7 @@ impl Range {
         return self.flags & Flags::Writeable as u32 != 0;
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         return self.name.as_str();
     }
 }
@@ -53,15 +53,23 @@ impl Memory {
         return Memory { ranges: Vec::new() };
     }
 
-    pub fn read_range(&self, address: u64, length: u64) -> Vec<u8>
-    {
+    pub fn read_range(&self, address: u64, length: u64) -> Vec<u8> {
         let mut data = Vec::new();
 
         for i in 0..length {
-           data.push(self.read(address + i));
+            data.push(self.read(address + i));
         }
 
         return data;
+    }
+
+    pub fn write_range(&mut self, address: u64, data: Vec<u8>) {
+        for i in 0..data.len() {
+            self.write(
+                address + i as u64,
+                data.get(i).expect("Write failed").clone(),
+            );
+        }
     }
 
     pub fn read(&self, address: u64) -> u8 {
@@ -70,7 +78,7 @@ impl Memory {
             .iter()
             .filter(|range| range.contains(address))
             .next()
-            .expect(format!("Bad memory access @ {:x}", address).as_str());
+            .expect(format!("Bad read attempt: {:x}", address).as_str());
         return range.read(address).clone();
     }
 
@@ -80,9 +88,29 @@ impl Memory {
             .iter_mut()
             .filter(|range| range.contains(address))
             .next()
-            .expect("Bad memory access!");
+            .expect(format!("Bad write attempt: {:x}", address).as_str());
 
         range.write(address, value);
+    }
+
+    pub fn exec_at(&self, address: u64) -> bool {
+        let range = self
+            .ranges
+            .iter()
+            .filter(|range| range.contains(address))
+            .next()
+            .expect(format!("Bad executable check: {:x}", address).as_str());
+        return range.can_exec();
+    }
+
+    pub fn name_at(&self, address: u64) -> &str {
+        let range = self
+            .ranges
+            .iter()
+            .filter(|range| range.contains(address))
+            .next()
+            .expect(format!("Bad executable check: {:x}", address).as_str());
+        return range.name();
     }
 
     pub fn reset(&mut self) {
@@ -104,7 +132,7 @@ impl Memory {
                 to: (section.virt_addr + section.size).into(),
                 flags: (section.flags & 0x01) | (section.flags & 0x04),
                 data: elf.extract_section(section.clone()).unwrap(),
-                name: elf.get_section_name(index).unwrap(),
+                name: elf.section_name(index).unwrap(),
             };
 
             println!("{}:   \t{:08x} - {:08x}", range.name, range.from, range.to);

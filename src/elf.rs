@@ -246,8 +246,7 @@ impl ELF {
         return Some(elf);
     }
 
-    #[allow(dead_code)]
-    pub fn get_section_name(&mut self, index: usize) -> Option<String> {
+    pub fn section_name(&mut self, index: usize) -> Option<String> {
         let string_section = self
             .sections
             .get(self.header.sh_str_index as usize)?

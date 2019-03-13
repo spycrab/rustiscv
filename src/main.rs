@@ -2,8 +2,10 @@ extern crate byteorder;
 extern crate nom;
 extern crate num;
 
+mod bin;
 mod cpu;
 mod elf;
+mod instruction;
 mod memory;
 
 fn main() {
