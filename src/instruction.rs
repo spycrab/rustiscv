@@ -5,16 +5,16 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Opcode {
     // Real opcodes
-    LUI = 0b0110111,
-    AUIPC = 0b0010111,
-    JAL = 0b1101111,
-    JALR = 0b1100111,
+    LUI = 0b011_0111,
+    AUIPC = 0b001_0111,
+    JAL = 0b110_1111,
+    JALR = 0b110_0111,
 
-    ImmOps = 0b0010011,
-    RegOps = 0b0110011,
-    StoreOps = 0b0100011,
-    CondJumps = 0b1100011,
-    LoadOps = 0b0000011,
+    ImmOps = 0b001_0011,
+    RegOps = 0b011_0011,
+    StoreOps = 0b010_0011,
+    CondJumps = 0b110_0011,
+    LoadOps = 0b000_0011,
 
     // Logical opcodes
     ADDI,
@@ -40,19 +40,18 @@ pub enum Opcode {
 
 impl Opcode {
     fn to(instruction: u32) -> Opcode {
+        use Opcode::*;
+
         let value: u32 = get_bits(instruction.into(), 0, 6);
 
-        use Opcode::*;
         let opcodes = [
             ImmOps, LUI, AUIPC, RegOps, JAL, JALR, CondJumps, LoadOps, StoreOps,
         ];
 
-        let opcode = opcodes
+        let opcode = *opcodes
             .iter()
-            .filter(|&opcode| value == opcode.clone() as u32)
-            .next()
-            .expect(&format!("Unknown opcode {:07b}", value as u32))
-            .clone();
+            .find(|&opcode| value == *opcode as u32)
+            .unwrap_or_else(|| panic!("Unknown opcode {:07b}", value as u32));
 
         if opcode == ImmOps {
             let op = get_bits(instruction.into(), 12, 14);
@@ -71,8 +70,8 @@ impl Opcode {
             let op = get_bits(instruction.into(), 25, 31);
 
             return match op {
-                0b0000000 => ADD,
-                0b0100000 => SUB,
+                0b000_0000 => ADD,
+                0b010_0000 => SUB,
                 _ => {
                     panic!("Unknown subtype of register operation: {:06b}", op);
                 }
@@ -134,7 +133,8 @@ pub struct Instruction {
 impl Instruction {
     fn immediate_range(opcode: Opcode) -> Option<Vec<(usize, usize)>> {
         use Opcode::*;
-        return match opcode {
+
+        match opcode {
             ADDI | SLLI | ANDI => Some(vec![(20, 31)]),
             JALR => Some(vec![(20, 31)]),
             JAL => Some(vec![(21, 30), (20, 20), (12, 19), (31, 31)]),
@@ -142,7 +142,7 @@ impl Instruction {
             BLT | BGEU | BLTU | BNE => Some(vec![(8, 11), (25, 30), (7, 7), (31, 31)]),
             SW | SH | SB | LW | LH | LB => Some(vec![(7, 11), (25, 31)]),
             _ => None,
-        };
+        }
     }
 
     fn has_dst(_opcode: Opcode) -> bool {
@@ -190,20 +190,23 @@ impl Instruction {
         });
 
         Instruction {
-            opcode: opcode.clone(),
-            src1: match Instruction::has_src1(opcode) {
-                true => Some(src1),
-                false => None,
+            opcode,
+            src1: if Instruction::has_src1(opcode) {
+                Some(src1)
+            } else {
+                None
             },
-            src2: match Instruction::has_src2(opcode) {
-                true => Some(src2),
-                false => None,
+            src2: if Instruction::has_src2(opcode) {
+                Some(src2)
+            } else {
+                None
             },
-            dst: match Instruction::has_dst(opcode) {
-                true => Some(dst),
-                false => None,
+            dst: if Instruction::has_dst(opcode) {
+                Some(dst)
+            } else {
+                None
             },
-            imm: imm,
+            imm,
         }
     }
 

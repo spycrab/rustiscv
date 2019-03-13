@@ -157,7 +157,7 @@ impl ELF {
         let mut file = File::open(path).expect("Failed to open file");
 
         let mut header_data = [0; 52];
-        file.read(&mut header_data).expect("Error!");
+        file.read_exact(&mut header_data).expect("Error!");
 
         let header = header(&header_data).expect("Failed to parse ELF header!").1;
 
@@ -179,8 +179,8 @@ impl ELF {
         }
 
         let mut elf: ELF = ELF {
-            file: file,
-            header: header,
+            file,
+            header,
             programs: Vec::new(),
             sections: std::vec::Vec::new(),
         };
@@ -192,14 +192,14 @@ impl ELF {
 
         for i in 0..elf.header.ph_entry_count {
             let mut program_data = [0; 32];
-            elf.file.read(&mut program_data).expect("Error!");
+            elf.file.read_exact(&mut program_data).expect("Error!");
 
             let program = program(&program_data)
                 .expect("Failed to parse program header!")
                 .1;
 
             if LIST_PROGRAMS {
-                println!("");
+                println!();
                 println!("Program {}:", i);
                 println!("Type: {:x}", program.prog_type);
                 println!("VirtAddr: {:x}", program.virt_addr);
@@ -220,14 +220,14 @@ impl ELF {
 
         for i in 0..elf.header.sh_entry_count {
             let mut section_data = [0; 40];
-            elf.file.read(&mut section_data).expect("Error!");
+            elf.file.read_exact(&mut section_data).expect("Error!");
 
             let section = section(&section_data)
                 .expect("Failed to parse section header!")
                 .1;
 
             if LIST_SECTIONS {
-                println!("");
+                println!();
                 println!("Section {}:", i);
                 println!("Name Offset: {:x}", section.name_offset);
                 println!("Type: {:x}", section.section_type);

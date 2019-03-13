@@ -73,30 +73,25 @@ impl Memory {
     }
 
     fn get_range(&self, address: u64) -> Option<&Range> {
-        self.ranges
-            .iter()
-            .filter(|range| range.contains(address))
-            .next()
+        self.ranges.iter().find(|range| range.contains(address))
     }
 
     fn get_range_mut(&mut self, address: u64) -> Option<&mut Range> {
-        self.ranges
-            .iter_mut()
-            .filter(|range| range.contains(address))
-            .next()
+        self.ranges.iter_mut().find(|range| range.contains(address))
     }
 
     pub fn read(&self, address: u64) -> u8 {
         let range = self
             .get_range(address)
-            .expect(format!("Bad read attempt: {:x}", address).as_str());
-        range.read(address).clone()
+            .unwrap_or_else(|| panic!("Bad read attempt: {:x}", address));
+
+        *range.read(address)
     }
 
     pub fn write(&mut self, address: u64, value: u8) {
         let range = self
             .get_range_mut(address)
-            .expect(format!("Bad write attempt: {:x}", address).as_str());
+            .unwrap_or_else(|| panic!("Bad write attempt: {:x}", address));
 
         range.write(address, value);
     }
@@ -104,7 +99,7 @@ impl Memory {
     pub fn exec_at(&self, address: u64) -> bool {
         let range = self
             .get_range(address)
-            .expect(format!("Bad executable check: {:x}", address).as_str());
+            .unwrap_or_else(|| panic!("Bad executable check: {:x}", address));
 
         range.can_exec()
     }
@@ -112,7 +107,7 @@ impl Memory {
     pub fn name_at(&self, address: u64) -> &str {
         let range = self
             .get_range(address)
-            .expect(format!("Bad executable check: {:x}", address).as_str());
+            .unwrap_or_else(|| panic!("Bad executable check: {:x}", address));
 
         range.name()
     }
@@ -156,7 +151,7 @@ impl Memory {
                 to: (program.virt_addr + program.mem_size).into(),
                 flags: Flags::Executable as u32,
                 name: "unnamed".to_string(),
-                data: data,
+                data,
             };
 
             println!(

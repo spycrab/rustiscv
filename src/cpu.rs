@@ -16,7 +16,7 @@ impl CPU {
         CPU {
             x: [0; 32],
             pc: 0,
-            memory: memory,
+            memory,
         }
     }
 
@@ -97,7 +97,7 @@ impl CPU {
             Opcode::LW => {
                 let offset = sign_extend::<u32>(ins.imm() as usize, 11);
                 let range = self.memory.read_range(
-                    (offset as u64).wrapping_add(self.register_read(ins.src1()).into()),
+                    u64::from(offset).wrapping_add(self.register_read(ins.src1()).into()),
                     4,
                 );
                 self.register_write(
