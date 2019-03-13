@@ -23,7 +23,6 @@ fn main() {
 
     memory.reset();
     memory.load_elf(&mut elf);
-    memory.read(0x10000);
 
     let mut cpu = CPU::new(memory);
 

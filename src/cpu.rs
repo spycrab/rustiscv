@@ -163,6 +163,7 @@ impl CPU {
             Opcode::JALR => {
                 let mut imm = sign_extend::<u32>(ins.imm() as usize, 11);
 
+                // TODO: This shouldn't be needed.
                 imm = ((imm as i32) >> 5) as u32;
 
                 println!("IMM: {:x}", imm);

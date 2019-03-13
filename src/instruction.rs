@@ -42,7 +42,6 @@ pub enum Opcode {
 
 impl Opcode {
     fn to(instruction: u32) -> Opcode {
-
         let value: u32 = get_bits(instruction.into(), 0, 6);
 
         let opcodes = [
@@ -144,8 +143,11 @@ impl Instruction {
         }
     }
 
-    fn has_dst(_opcode: Opcode) -> bool {
-        true
+    fn has_dst(opcode: Opcode) -> bool {
+        match opcode {
+            SB | SH | SW => false,
+            _ => true,
+        }
     }
 
     fn has_src1(opcode: Opcode) -> bool {
@@ -236,22 +238,22 @@ impl Instruction {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?} ", self.opcode)?;
+        write!(f, "{:?}", self.opcode)?;
 
         if let Some(dst) = self.dst {
-            write!(f, "x{}", dst)?;
+            write!(f, " x{}", dst)?;
         }
 
         if let Some(src1) = self.src1 {
-            write!(f, ", x{}", src1)?;
+            write!(f, " x{}", src1)?;
         }
 
         if let Some(src2) = self.src2 {
-            write!(f, ", x{}", src2)?;
+            write!(f, " x{}", src2)?;
         }
 
         if let Some(imm) = self.imm {
-            write!(f, ", 0x{}", imm)?;
+            write!(f, " 0x{}", imm)?;
         }
 
         Ok(())
