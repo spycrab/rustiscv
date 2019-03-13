@@ -181,8 +181,8 @@ impl ELF {
         let mut elf: ELF = ELF {
             file,
             header,
-            programs: Vec::new(),
-            sections: std::vec::Vec::new(),
+            programs: vec![],
+            sections: vec![],
         };
 
         // Parse program header
@@ -261,7 +261,7 @@ impl ELF {
     }
 
     pub fn extract_program(&mut self, program: Program) -> Option<Vec<u8>> {
-        let mut data: Vec<u8> = Vec::new();
+        let mut data: Vec<u8> = vec![];
 
         self.file
             .seek(SeekFrom::Start(program.offset.into()))
@@ -275,7 +275,7 @@ impl ELF {
     }
 
     pub fn extract_section(&mut self, section: Section) -> Option<Vec<u8>> {
-        let mut data: Vec<u8> = Vec::new();
+        let mut data: Vec<u8> = vec![];
 
         self.file
             .seek(SeekFrom::Start(section.offset.into()))

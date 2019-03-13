@@ -50,11 +50,11 @@ pub struct Memory {
 
 impl Memory {
     pub fn new() -> Memory {
-        Memory { ranges: Vec::new() }
+        Memory { ranges: vec![] }
     }
 
     pub fn read_range(&self, address: u64, length: u64) -> Vec<u8> {
-        let mut data = Vec::new();
+        let mut data = vec![];
 
         for i in 0..length {
             data.push(self.read(address + i));
@@ -119,7 +119,7 @@ impl Memory {
     pub fn load_elf(&mut self, elf: &mut elf::ELF) {
         // Load all sections
         let sections = elf.sections.clone();
-        for section in sections.iter() {
+        for section in &sections {
             // Skip non SHF_ALLOC sections
             if section.flags & 0x02 == 0 {
                 continue;
@@ -142,7 +142,7 @@ impl Memory {
         // Load all programs
         let programs = elf.programs.clone();
 
-        for program in programs.iter() {
+        for program in &programs {
             let mut data = elf.extract_program(program.clone()).unwrap();
             data.resize(program.mem_size as usize, 0);
 

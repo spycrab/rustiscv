@@ -2,6 +2,8 @@ use crate::bin::*;
 
 use std::fmt;
 
+use Opcode::*;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Opcode {
     // Real opcodes
@@ -40,7 +42,6 @@ pub enum Opcode {
 
 impl Opcode {
     fn to(instruction: u32) -> Opcode {
-        use Opcode::*;
 
         let value: u32 = get_bits(instruction.into(), 0, 6);
 
@@ -132,8 +133,6 @@ pub struct Instruction {
 
 impl Instruction {
     fn immediate_range(opcode: Opcode) -> Option<Vec<(usize, usize)>> {
-        use Opcode::*;
-
         match opcode {
             ADDI | SLLI | ANDI => Some(vec![(20, 31)]),
             JALR => Some(vec![(20, 31)]),
@@ -151,16 +150,16 @@ impl Instruction {
 
     fn has_src1(opcode: Opcode) -> bool {
         match opcode {
-            Opcode::AUIPC | Opcode::LUI => false,
+            AUIPC | LUI => false,
             _ => true,
         }
     }
 
     fn has_src2(opcode: Opcode) -> bool {
         match opcode {
-            Opcode::ADD | Opcode::SUB => true,
-            Opcode::BGEU | Opcode::BLT | Opcode::BLTU | Opcode::BNE => true,
-            Opcode::SB | Opcode::SH | Opcode::SW => true,
+            ADD | SUB => true,
+            BGEU | BLT | BLTU | BNE => true,
+            SB | SH | SW => true,
             _ => false,
         }
     }
