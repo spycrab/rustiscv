@@ -2,7 +2,7 @@ use num::{FromPrimitive, Num};
 
 pub fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
     assert!(
-        from > to || to >= std::mem::size_of::<T>() * 8,
+        from <= to && to < (std::mem::size_of::<T>() * 8),
         "get_bits: Invalid parameters!"
     );
 
@@ -19,7 +19,7 @@ pub fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T
 
 pub fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
     assert!(
-        length >= std::mem::size_of::<T>() * 8,
+        length < std::mem::size_of::<T>() * 8,
         "sign_extend: Invalid parameters!"
     );
 
