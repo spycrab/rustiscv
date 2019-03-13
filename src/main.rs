@@ -1,6 +1,6 @@
 extern crate byteorder;
 extern crate nom;
-extern crate num;
+extern crate num_traits;
 
 mod bin;
 mod cpu;

@@ -1,4 +1,4 @@
-use num::{FromPrimitive, Num};
+use num_traits::{FromPrimitive, Num};
 
 pub fn get_bits<T: Num + FromPrimitive>(input: u64, from: usize, to: usize) -> T {
     assert!(
