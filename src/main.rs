@@ -27,8 +27,5 @@ fn main() {
     let mut cpu = CPU::new(memory);
 
     cpu.set_pc(elf.header.entry_addr);
-
-    loop {
-        cpu.execute_instruction();
-    }
+    cpu.run();
 }

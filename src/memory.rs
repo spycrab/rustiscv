@@ -1,5 +1,10 @@
 use crate::elf;
 
+use std::str::FromStr;
+
+// Stack size is 2MB by default
+const STACK_SIZE: u64 = 2 * 1000 * 1000;
+
 enum Flags {
     Writeable = 0x01,
     Executable = 0x04,
@@ -20,6 +25,9 @@ impl Range {
 
     pub fn read(&self, address: u64) -> &u8 {
         let offset = address - self.from;
+
+        println!("{}: {}, {}, {}", self.name, offset, self.to - self.from, self.data.len());
+
         self.data.get(offset as usize).expect("Read failed")
     }
 
@@ -28,7 +36,11 @@ impl Range {
             panic!("Trying to write to a non-writeable memory range!");
         }
         let offset = address - self.from;
-        *self.data.get_mut(offset as usize).expect("Write failed") = value;
+
+        *self
+            .data
+            .get_mut(offset as usize)
+            .expect("Write out of bounds") = value;
     }
 
     pub fn can_exec(&self) -> bool {
@@ -46,11 +58,15 @@ impl Range {
 
 pub struct Memory {
     ranges: Vec<Range>,
+    pub stack_offset: Option<u64>,
 }
 
 impl Memory {
     pub fn new() -> Memory {
-        Memory { ranges: vec![] }
+        Memory {
+            ranges: vec![],
+            stack_offset: None,
+        }
     }
 
     pub fn read_range(&self, address: u64, length: u64) -> Vec<u8> {
@@ -65,10 +81,7 @@ impl Memory {
 
     pub fn write_range(&mut self, address: u64, data: &[u8]) {
         for i in 0..data.len() {
-            self.write(
-                address + i as u64,
-                data.get(i).expect("Write failed").clone(),
-            );
+            self.write(address + i as u64, data.get(i).unwrap().clone());
         }
     }
 
@@ -117,8 +130,9 @@ impl Memory {
     }
 
     pub fn load_elf(&mut self, elf: &mut elf::ELF) {
-        // Load all sections
+        println!("Loading ELF...");
         let sections = elf.sections.clone();
+
         for section in &sections {
             // Skip non SHF_ALLOC sections
             if section.flags & 0x02 == 0 {
@@ -134,10 +148,28 @@ impl Memory {
                 name: elf.section_name(index).unwrap(),
             };
 
+            self.stack_offset = Some(range.to);
+
             println!("{}:   \t{:08x} - {:08x}", range.name, range.from, range.to);
 
             self.ranges.push(range);
         }
+
+        // Create a stack section
+        let stack = Range {
+            // TODO: This whole thing is a bad idea for placing the stack
+            from: self.stack_offset.unwrap(),
+            to: self.stack_offset.unwrap() + STACK_SIZE,
+            flags: Flags::Writeable as u32,
+            data: vec![0; STACK_SIZE as usize],
+            name: String::from_str("Stack").unwrap(),
+        };
+
+        println!("Created stack at {:x}", stack.from);
+
+        self.stack_offset = Some(self.stack_offset.unwrap() + 4 + 4);
+
+        self.ranges.push(stack);
 
         // Load all programs
         let programs = elf.programs.clone();

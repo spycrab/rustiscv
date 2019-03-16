@@ -48,7 +48,21 @@ impl CPU {
         self.pc = pc;
     }
 
-    pub fn execute_instruction(&mut self) -> bool {
+    pub fn run(&mut self) {
+        println!("");
+
+        self.register_write(1, 0xcccccccc);
+        self.register_write(2, self.memory.stack_offset.expect("No stack!") as u32);
+
+        while self.execute_instruction() {
+            if self.pc == 0xcccccccc {
+                break;
+            }
+        }
+        println!("Emulation stopped.");
+    }
+
+    fn execute_instruction(&mut self) -> bool {
         if !self.memory.exec_at(self.pc.into()) {
             panic!("Program jumped to non-executable memory!");
         }
@@ -119,6 +133,8 @@ impl CPU {
                 let value = self.register_read(ins.src2());
                 let mut buf = Cursor::new(vec![]);
 
+                println!("Offset: {}", offset);
+
                 buf.write_u32::<LittleEndian>(value).unwrap();
 
                 self.memory.write_range(
@@ -161,12 +177,9 @@ impl CPU {
                 );
             }
             Opcode::JALR => {
-                let mut imm = sign_extend::<u32>(ins.imm() as usize, 11);
+                let imm = sign_extend::<u32>(ins.imm() as usize, 11);
 
-                // TODO: This shouldn't be needed.
-                imm = ((imm as i32) >> 5) as u32;
-
-                println!("IMM: {:x}", imm);
+                println!("IMM: {}", imm as i32);
                 println!("x{}: {:x}", ins.src1(), self.register_read(ins.src1()));
 
                 self.register_write(ins.dst(), self.pc + 4);

@@ -240,8 +240,6 @@ impl ELF {
             elf.sections.push(section);
         }
 
-        println!("ELF parsed successfully.");
-
         Some(elf)
     }
 

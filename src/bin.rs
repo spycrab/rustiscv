@@ -26,8 +26,6 @@ pub fn sign_extend<T: Num + FromPrimitive>(input: usize, length: usize) -> T {
     let mut value = input;
     let sign = (value & (1 << length)) >> length;
 
-    value &= !(1 << length);
-
     for i in (length + 1)..(std::mem::size_of::<T>() * 8) {
         value |= sign << i;
     }
