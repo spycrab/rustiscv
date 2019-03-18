@@ -53,13 +53,14 @@ impl CPU {
 
         self.register_write(1, 0xcccccccc);
         self.register_write(2, self.memory.stack_offset.expect("No stack!") as u32);
+        self.register_write(8, self.memory.stack_offset.expect("No stack!") as u32);
 
         while self.execute_instruction() {
             if self.pc == 0xcccccccc {
                 break;
             }
         }
-        println!("Emulation stopped.");
+        println!("Emulation stopped. Return code: {}", self.register_read(10));
     }
 
     fn execute_instruction(&mut self) -> bool {
@@ -134,6 +135,7 @@ impl CPU {
                 let mut buf = Cursor::new(vec![]);
 
                 println!("Offset: {}", offset);
+                println!("Val({}): {}", ins.src2(), value);
 
                 buf.write_u32::<LittleEndian>(value).unwrap();
 
