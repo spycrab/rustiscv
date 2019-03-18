@@ -26,19 +26,25 @@ impl Range {
     pub fn read(&self, address: u64) -> &u8 {
         let offset = address - self.from;
 
-        self.data.get(offset as usize).expect("Read failed")
+        let name = &self.name;
+
+        self.data.get(offset as usize).unwrap_or_else(|| {
+            panic!("{}: Read failed", name);
+        })
     }
 
     pub fn write(&mut self, address: u64, value: u8) {
+        let name = &self.name;
+
         if !self.can_write() {
-            panic!("Trying to write to a non-writeable memory range!");
+            panic!("{}: Trying to write to a non-writeable memory range!", name);
         }
+        
         let offset = address - self.from;
 
-        *self
-            .data
-            .get_mut(offset as usize)
-            .expect("Write out of bounds") = value;
+        *self.data.get_mut(offset as usize).unwrap_or_else(|| {
+            panic!("{}: Write out of bounds", name);
+        }) = value;
     }
 
     pub fn can_exec(&self) -> bool {
