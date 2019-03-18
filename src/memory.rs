@@ -26,8 +26,6 @@ impl Range {
     pub fn read(&self, address: u64) -> &u8 {
         let offset = address - self.from;
 
-        println!("{}: {}, {}, {}", self.name, offset, self.to - self.from, self.data.len());
-
         self.data.get(offset as usize).expect("Read failed")
     }
 
@@ -167,7 +165,7 @@ impl Memory {
 
         println!("Created stack at {:x}", stack.from);
 
-        self.stack_offset = Some(self.stack_offset.unwrap() + 4 + 4);
+        self.stack_offset = Some(self.stack_offset.unwrap() + 32);
 
         self.ranges.push(stack);
 
