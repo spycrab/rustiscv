@@ -20,7 +20,7 @@ struct Range {
 
 impl Range {
     pub fn contains(&self, address: u64) -> bool {
-        self.from <= address && address <= self.to
+        self.from <= address && address < self.to
     }
 
     pub fn read(&self, address: u64) -> &u8 {
@@ -39,7 +39,7 @@ impl Range {
         if !self.can_write() {
             panic!("{}: Trying to write to a non-writeable memory range!", name);
         }
-        
+
         let offset = address - self.from;
 
         *self.data.get_mut(offset as usize).unwrap_or_else(|| {
