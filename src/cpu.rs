@@ -105,14 +105,34 @@ impl CPU {
                 let imm = ins.imm();
                 self.register_write(ins.dst(), self.register_read(ins.src1()) << imm);
             }
+            Opcode::SRAI => {
+                let imm = ins.imm();
+
+                let sign_bit = self.register_read(ins.src1()) & 31 >> 31;
+
+                let mut value = self.register_read(ins.src1()) >> imm;
+
+                for i in (32 - imm)..=31 {
+                    value |= (sign_bit) << i;
+                }
+
+                self.register_write(ins.dst(), value);
+            }
+            Opcode::SRLI => {
+                let imm = ins.imm();
+                self.register_write(ins.dst(), self.register_read(ins.src1()) >> imm);
+            }
             Opcode::ANDI => {
                 let imm = ins.imm();
                 self.register_write(ins.dst(), self.register_read(ins.src1()) & imm);
             }
             Opcode::LW => {
+                // TODO: This is garbage and needs reworking
                 let offset = sign_extend::<u32>(ins.imm() as usize, 11);
+
                 let range = self.memory.read_range(
-                    u64::from(offset).wrapping_add(self.register_read(ins.src1()).into()),
+                    ((self.register_read(ins.src1()) as i32).wrapping_add(offset as i32) - 6)
+                        as u64,
                     4,
                 );
                 self.register_write(
@@ -209,6 +229,19 @@ impl CPU {
                     return true;
                 }
             }
+            Opcode::BEQ => {
+                let branch = self.register_read(ins.src1()) == self.register_read(ins.src2());
+
+                if branch {
+                    let offset = ins.imm();
+                    self.register_write(ins.dst(), self.pc + 4);
+
+                    self.pc = self
+                        .pc
+                        .wrapping_add(sign_extend::<u32>(offset as usize, 11).wrapping_mul(2));
+                    return true;
+                }
+            }
             Opcode::BLT => {
                 let branch = (self.register_read(ins.src1()) as i32)
                     < (self.register_read(ins.src2()) as i32);
@@ -250,7 +283,7 @@ impl CPU {
                 }
             }
             _ => {
-                panic!("Unimplemented!");
+                panic!("Unimplemented: {:?}", ins.opcode());
             }
         }
 

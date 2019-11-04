@@ -19,13 +19,16 @@ pub enum Opcode {
     LoadOps = 0b000_0011,
 
     // Logical opcodes
-    ADDI,
+    ADDI = 0x100,
     SLLI,
+    SRLI,
     ANDI,
+    SRAI,
 
     ADD,
     SUB,
 
+    BEQ,
     BNE,
     BGEU,
     BLTU,
@@ -59,6 +62,13 @@ impl Opcode {
             return match op {
                 0b000 => ADDI,
                 0b001 => SLLI,
+                0b101 => match get_bits(instruction.into(), 25, 31) {
+                    0b0000000 => SRLI,
+                    0b0100000 => SRAI,
+                    _ => {
+                        panic!("Unknown subtype of immediate operation: {:06b}", op);
+                    }
+                },
                 0b111 => ANDI,
                 _ => {
                     panic!("Unknown subtype of immediate operation: {:03b}", op);
@@ -81,6 +91,7 @@ impl Opcode {
         if opcode == CondJumps {
             let op = get_bits(instruction.into(), 12, 14);
             return match op {
+                0b000 => BEQ,
                 0b001 => BNE,
                 0b110 => BLTU,
                 0b100 => BLT,
@@ -133,11 +144,12 @@ pub struct Instruction {
 impl Instruction {
     fn immediate_range(opcode: Opcode) -> Option<Vec<(usize, usize)>> {
         match opcode {
-            ADDI | SLLI | ANDI => Some(vec![(20, 31)]),
+            ADDI | ANDI => Some(vec![(20, 31)]),
+            SLLI | SRLI | SRAI => Some(vec![(20, 24)]),
             JALR => Some(vec![(20, 31)]),
             JAL => Some(vec![(21, 30), (20, 20), (12, 19), (31, 31)]),
             LUI | AUIPC => Some(vec![(12, 31)]),
-            BLT | BGEU | BLTU | BNE => Some(vec![(8, 11), (25, 30), (7, 7), (31, 31)]),
+            BLT | BGEU | BLTU | BNE | BEQ => Some(vec![(8, 11), (25, 30), (7, 7), (31, 31)]),
             SW | SH | SB | LW | LH | LB => Some(vec![(7, 11), (25, 31)]),
             _ => None,
         }
@@ -160,7 +172,7 @@ impl Instruction {
     fn has_src2(opcode: Opcode) -> bool {
         match opcode {
             ADD | SUB => true,
-            BGEU | BLT | BLTU | BNE => true,
+            BGEU | BLT | BLTU | BNE | BEQ => true,
             SB | SH | SW => true,
             _ => false,
         }
